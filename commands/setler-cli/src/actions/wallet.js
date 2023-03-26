@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { gatekeep } from "../lib/wallet/gatekeep.js";
 import prompts from "prompts";
+import { stringToColorBlocks } from "../lib/colorize.js";
 import { waitFor } from "../lib/wait.js";
 
 const log = console.log;
@@ -11,6 +12,69 @@ const exec = async (context) => {
     case "init":
       await gatekeep(context, true);
       break;
+    case "balance": {
+      await gatekeep(context);
+
+      let network = context.flags.network || "xrpl:testnet";
+      if (network === "testnet") {
+        network = "xrpl:testnet";
+      } else if (network === "livenet") {
+        network = "xrpl:livenet";
+      }
+      const keys = await context.vault.keys();
+
+      // convert xrpl:testnet to keys[xrpl][testnet]
+      let walletAddress;
+      const networkParts = network.split(":");
+      if (networkParts.length === 1) {
+        walletAddress = keys[network].address;
+      } else {
+        walletAddress = keys[networkParts[0]][networkParts[1]].address;
+      }
+
+      // input[2] could be {address}, in which case we should fund that address
+      // ask for the address
+      const response = await prompts([
+        {
+          type: "text",
+          name: "address",
+          message: `Enter the address whose balance you want to check: `,
+          initial: walletAddress,
+        },
+      ]);
+      if (!response.address) {
+        process.exit(1);
+      }
+      walletAddress = response.address;
+
+      const balancePromise = context.coins.getBalancesXrpl({
+        network,
+        address: walletAddress,
+      });
+      const balance = await waitFor(balancePromise, {
+        text:
+          `Checking balance for ${walletAddress} on ` +
+          chalk.magenta(`${network}\n`) +
+          " ".repeat(`Checking balance for   `.length) +
+          stringToColorBlocks(walletAddress, network),
+      });
+      if (balance) {
+        log(
+          chalk.bold(
+            `\nBalance: ` +
+              chalk.green(`${balance?.xrp.toLocaleString()} XRP`) +
+              ` ~ $` +
+              chalk.cyan(`${parseFloat(balance?.usd).toFixed(2)}`)
+          )
+        );
+      } else {
+        log(chalk.red(`Balance check failed.`));
+      }
+
+      await context.coins.disconnect();
+
+      break;
+    }
     case "fund": {
       await gatekeep(context);
 
@@ -58,10 +122,19 @@ const exec = async (context) => {
         address: walletAddress,
       });
       const status = await waitFor(faucetPromise, {
-        text: `Funding ${walletAddress} on ${network}`,
+        text:
+          `Funding ` +
+          chalk.yellow(`${walletAddress}`) +
+          ` on ` +
+          chalk.magenta(`${network}\n`) +
+          " ".repeat(`Funding   `.length) +
+          stringToColorBlocks(walletAddress, network),
       });
       if (status) {
-        log(chalk.bold(`Ok, funded. New balance: ${status.balance}`));
+        log(
+          chalk.bold(`Ok, funded. New balance: `) +
+            chalk.green(`${status.balance}`)
+        );
       } else {
         log(chalk.red(`Funding failed.`));
       }
@@ -135,6 +208,8 @@ const exec = async (context) => {
         log("  init");
         log("  keys");
         log("  mnemonic {get,set}");
+        log("  fund");
+        log("  balance");
         log("");
         log("Options:");
         log(
@@ -151,6 +226,7 @@ const exec = async (context) => {
         log("  setler wallet keys --profile 1 --scope 5");
         log("  setler wallet mnemonic --yes --scope 0");
         log("  setler wallet mnemonic set --scope 1");
+        log("  setler wallet balance --network xrpl:testnet --profile 0");
         log("");
 
         process.exit(1);
