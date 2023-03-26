@@ -1,3 +1,4 @@
 type Mutation {
 	setPayVia(identifier: String!, type: PaymentMethods!, value: String!): PaymentMethod
+	submitPoolRequest(rid: String!, path: String!, in: String!, signature: String!): PoolResponse
 }

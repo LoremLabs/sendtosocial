@@ -1,7 +1,8 @@
+import { bytesToHex, hexToBytes as hexTo } from "@noble/hashes/utils";
+
 import { DEFAULTS } from "./config.js";
 import { deriveAddressFromBytes } from "./wallet/keys.js";
 import fetch from "node-fetch";
-import { hexToBytes as hexTo } from "@noble/hashes/utils";
 import { shortId } from "./short-id.js";
 
 const log = console.log;
@@ -11,8 +12,14 @@ const log = console.log;
 // wrapper for auth things
 export const AuthAgent = function ({ context }) {
   this.context = context;
-
-  // identResolver is context.
+  let identResolver =
+    context.config.identity?.identResolver || DEFAULTS.IDENTITY.RESOLVER; // error if not set
+  // trim any leading or trailing whitespace
+  identResolver = identResolver.trim();
+  if (identResolver.endsWith("/")) {
+    identResolver = identResolver.slice(0, -1);
+  }
+  this.identResolver = identResolver;
 };
 
 AuthAgent.prototype.startAuth = async function ({ did }) {
@@ -56,14 +63,15 @@ AuthAgent.prototype.startEmailAuth = async function ({ email, state }) {
   if (!context.keys) {
     context.keys = await context.vault.keys();
   }
-  log(`keys: ${JSON.stringify(context.keys, null, "  ")}`);
 
   // get our address from the context
   const a = hexToBytes(context.keys.kudos.publicKey);
   const address = deriveAddressFromBytes(a);
 
   const payload = JSON.stringify({
-    state,
+    state, // nonce
+    email,
+    address, // keep in the payload
   });
 
   // sign the payload
@@ -84,14 +92,101 @@ AuthAgent.prototype.startEmailAuth = async function ({ email, state }) {
   // log({verified});
 
   const request = {
-    address,
     rid: shortId(),
     path: "/auth/email/login",
     in: payload,
-    signature: `${signature}${recId}`, // TODO: is there a standard for this?
+    signature: `${signature}${recId}`, // TODO: is there a standard for this? recId is 0 or 1
   };
 
   log({ request });
+
+  const { response, status } = await this.sendToPool({ request, context });
+  log({ response, status });
+};
+
+AuthAgent.prototype.sendToPool = async function ({ request, context }) {
+  const identityResolver = this.identResolver || DEFAULTS.IDENTITY.RESOLVER;
+
+  const gqlQuery = {
+    query: `mutation PoolRequest($requestId: String!, $path: String!, $in: String!, $signature: String!) {
+      submitPoolRequest(rid: $requestId, path: $path, in: $in, signature: $signature) {
+        status {
+          code
+          message
+        }
+        response {
+          rid
+          path
+          out
+          signature,
+        }
+      }
+    }`,
+
+    variables: {
+      requestId: request.rid,
+      path: request.path,
+      in: request.in,
+      signature: request.signature,
+    },
+    operationName: "PoolRequest",
+    extensions: {},
+  };
+  // console.log('gqlQuery', gqlQuery);
+  let results = {};
+
+  if (!identityResolver) {
+    throw new Error("identResolver is required");
+  }
+
+  // TODO: it would be better to batch these rather than one at a time...
+  try {
+    const headers = {
+      accept: "application/json",
+      "content-type": "application/json",
+    };
+
+    const options = {
+      headers,
+      method: "POST",
+      body: JSON.stringify(gqlQuery),
+    };
+    // console.log(fetchToCurl(`${identityResolver}/api/v1/gql`, options));
+    // remove trailing slash if it's on identityResolver
+    results = await fetch(`${identityResolver}/gql`, options).then(
+      async (r) => {
+        // check status code
+        if (r.status !== 200) {
+          log(`\nError submitting pool request: ${r.status} ${r.statusText}\n`);
+          const json = await r.json(); // not guaranteed to be json :(
+          if (json) {
+            const errMsg = json.data?.PoolRequest?.status?.message || "";
+            throw new Error(errMsg);
+          }
+          throw new Error("Error submitting pool request");
+        }
+
+        const out = await r.json();
+        // console.log('out', JSON.stringify(out,null,2));
+        return out;
+      }
+    );
+  } catch (e) {
+    console.log("error fetching pool request", e);
+    results.status = {
+      message: "Error fetching pool request: " + e.message,
+      code: 500,
+    };
+
+    return results;
+  }
+
+  // console.log({ results });
+
+  const response = results?.data?.submitPoolRequest?.response || {};
+  const status = results?.data?.submitPoolRequest?.status || {};
+
+  return { response, status };
 };
 
 export const expandDid = async ({ did, network }) => {
