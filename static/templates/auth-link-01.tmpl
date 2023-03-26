@@ -1,0 +1,139 @@
+---
+title: "Confirm your email address"
+preheader: "Please confirm your email address in order to activate your account"
+bodyClass: bg-white
+---
+
+<!DOCTYPE {{{ page.doctype || 'html' }}}>
+<html
+  lang="{{ page.language || 'en' }}"
+  xmlns:v="urn:schemas-microsoft-com:vml"
+>
+  <head>
+    <meta charset="{{ page.charset || 'utf-8' }}" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="format-detection"
+      content="telephone=no, date=no, address=no, email=no, url=no"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <!--[if mso]>
+      <noscript>
+        <xml>
+          <o:OfficeDocumentSettings
+            xmlns:o="urn:schemas-microsoft-com:office:office"
+          >
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+          </o:OfficeDocumentSettings>
+        </xml>
+      </noscript>
+      <style>
+        td,
+        th,
+        div,
+        p,
+        a,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+          font-family: 'Segoe UI', sans-serif;
+          mso-line-height-rule: exactly;
+        }
+      </style>
+    <![endif]-->
+    <if condition="page.title">
+      <title>{{{ page.title }}}</title>
+    </if>
+    <style>
+      {{{ page.css }}}
+    </style>
+    <block name="head"></block>
+  </head>
+  <body
+    class="m-0 p-0 w-full [word-break:break-word] [-webkit-font-smoothing:antialiased] {{ page.bodyClass || '' }}"
+  >
+    <if condition="page.preheader">
+      <div class="hidden">
+        {{{ page.preheader }}}
+        <each loop="item in Array.from(Array(150))">&#847; </each>
+      </div>
+    </if>
+    <div
+      role="article"
+      aria-roledescription="email"
+      aria-label="{{{ page.title || '' }}}"
+      lang="{{ page.language || 'en' }}"
+    >
+    <table class="w-full font-sans">
+      <tr>
+        <td align="center" class="bg-white">
+          <table class="w-150 sm:w-full">
+            <tr>
+              <td class="p-12 sm:py-8 sm:px-6 text-center">
+                <a href="https://www.fairpass.co/">
+                  <img src="https://www.fairpass.co/email/magic-link/fairpass-troll-circle.png" width="98" alt="FairPass" class="max-w-full align-middle [border:0]">
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" class="sm:px-6">
+                <table class="w-full">
+                  <tr>
+                    <td class="p-12 sm:px-6 bg-slate-50 text-slate-700 text-base text-left leading-6 rounded shadow-sm">
+                      <p>
+                        Hello,
+                      </p>
+                      <p class="text-2xl sm:leading-8 text-black font-semibold m-0 mb-6">
+                        Is this what you're looking for?
+                      </p>
+                      <p class="m-0 mb-6">
+                        Please confirm your email address by clicking the button below:
+                      </p>
+                      <div class="leading-full">
+                        <a
+                          href="{{link}}"
+                          class="inline-block py-3.5 px-4 rounded text-base font-semibold text-center [text-decoration:none] text-white bg-theme-primary hover:bg-theme-secondary"
+                        >
+                          <outlook>
+                            <i class="tracking-6 -mso-font-width-full mso-text-raise-7.5">&#8202;</i>
+                          </outlook>
+                          <span class="mso-text-raise-4">Confirm email address &rarr;</span>
+                          <outlook>
+                            <i class="tracking-6 -mso-font-width-full">&#8202;</i>
+                          </outlook>
+                        </a>
+                      </div>
+                      <table class="w-full" role="separator">
+                        <tr>
+                          <td class="py-8">
+                            <div class="bg-slate-200 h-px leading-px">&zwnj;</div>
+                          </td>
+                        </tr>
+                      </table>
+                      <p class="m-0 mb-4">
+                        If you didn't sign up for FairPass, you can safely ignore this email.
+                      </p>
+                      <p class="m-0 mb-4">
+                        Thanks, <br />Fair Pass
+                      </p>
+                    </td>
+                  </tr>
+                  <tr role="separator">
+                    <td class="h-12"></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </div>
+  </body>
+</html>
+
