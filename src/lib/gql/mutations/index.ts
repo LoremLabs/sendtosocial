@@ -117,7 +117,53 @@ export const submitPoolRequest = async (_, params) => {
 		switch (path) {
 			case '/auth/email/login': {
 				// start email stuff
-				reply.status.message = 'OK!';
+
+				// generate a 6 character code from the alphabet: BCDFGHJKLMNPQRSTVWXZ
+				// from: https://www.oauth.com/oauth2-servers/device-flow/authorization-server-requirements/
+				const alphabet = 'BCDFGHJKLMNPQRSTVWXZ';
+				const randChars = (length) => Array.from({length }).map(() => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+				const code = `${randChars(4)}-${randChars(4)}`;
+
+				// reply.status.message = code;
+
+				const out = {};
+				out.code = code;
+
+				// save the code to redis
+				const cacheKey = `auth-email-login-${rid}`;
+				await redis.set(cacheKey, JSON.stringify({...input, code}), {'EX': 60 * 15}); // 15 minutes
+
+				// create email
+
+				// TODO	HERE			  
+					const output = await createAuthLinkEmail({
+					  template: 'auth-link-01',
+					  options: { to: email, next: params.src, linkId: params.linkId },
+					});
+				  
+					const botEmail = `"Fair Pass" <no-reply@notify.fairpass.co>`;
+					const msg = {
+					  'h:Sender': botEmail,
+					  from: `no-reply@notify.fairpass.co`,
+					  to: [email],
+					  //        bcc: [email],
+					  subject: output.subject || 'Fair Pass - 🚀 Link Login',
+					  //text,
+					  html: output.html,
+					  //        headers, // must have h: prefix, but maybe we don't want them anyway
+					  // attachment: files,
+					  'o:tracking-clicks': 'htmlonly',
+					  'o:tag=': 'login',
+					};
+				  
+					const result = await sendEmail(msg);
+					return result;
+				  };
+				  
+
+				// send email
+
+				reply.response.out = JSON.stringify(out);
 
 				break;
 			}
