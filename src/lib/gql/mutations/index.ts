@@ -1,6 +1,7 @@
 import * as secp256k1 from '@noble/secp256k1';
 
 import { bytesToHex, hexToBytes as hexTo } from '@noble/hashes/utils';
+import { composeEmail, sendEmail } from '$lib/email/email';
 
 import { Redis } from '@upstash/redis';
 import addressCodec from 'ripple-address-codec';
@@ -121,7 +122,10 @@ export const submitPoolRequest = async (_, params) => {
 				// generate a 6 character code from the alphabet: BCDFGHJKLMNPQRSTVWXZ
 				// from: https://www.oauth.com/oauth2-servers/device-flow/authorization-server-requirements/
 				const alphabet = 'BCDFGHJKLMNPQRSTVWXZ';
-				const randChars = (length) => Array.from({length }).map(() => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+				const randChars = (length) =>
+					Array.from({ length })
+						.map(() => alphabet[Math.floor(Math.random() * alphabet.length)])
+						.join('');
 				const code = `${randChars(4)}-${randChars(4)}`;
 
 				// reply.status.message = code;
@@ -131,36 +135,35 @@ export const submitPoolRequest = async (_, params) => {
 
 				// save the code to redis
 				const cacheKey = `auth-email-login-${rid}`;
-				await redis.set(cacheKey, JSON.stringify({...input, code}), {'EX': 60 * 15}); // 15 minutes
+				await redis.set(cacheKey, JSON.stringify({ ...input, code }), { EX: 60 * 15 }); // 15 minutes
 
 				// create email
+				const email = input.email.trim();
 
-				// TODO	HERE			  
-					const output = await createAuthLinkEmail({
-					  template: 'auth-link-01',
-					  options: { to: email, next: params.src, linkId: params.linkId },
-					});
-				  
-					const botEmail = `"Fair Pass" <no-reply@notify.fairpass.co>`;
-					const msg = {
-					  'h:Sender': botEmail,
-					  from: `no-reply@notify.fairpass.co`,
-					  to: [email],
-					  //        bcc: [email],
-					  subject: output.subject || 'Fair Pass - 🚀 Link Login',
-					  //text,
-					  html: output.html,
-					  //        headers, // must have h: prefix, but maybe we don't want them anyway
-					  // attachment: files,
-					  'o:tracking-clicks': 'htmlonly',
-					  'o:tag=': 'login',
-					};
-				  
-					const result = await sendEmail(msg);
-					return result;
-				  };
-				  
+				// TODO	HERE
+				const output = await composeEmail({
+					template: 'auth-link-01',
+					options: { to: email, next: '', linkId: '', code, baseUrl: 'https://graph.ident.agency' }
+				});
 
+				const botEmail = `"Send to Social" <no-reply@notify.ident.agency>`;
+				const msg = {
+					'h:Sender': botEmail,
+					from: `no-reply@notify.ident.agency`,
+					to: [email],
+					//        bcc: [email],
+					subject: output.subject || 'Send to Social - 🚀 Login',
+					//text,
+					html: output.html,
+					//        headers, // must have h: prefix, but maybe we don't want them anyway
+					// attachment: files,
+					'o:tracking-clicks': 'htmlonly',
+					'o:tag=': 'login'
+				};
+
+				const result = await sendEmail(msg);
+				log.debug({ result });
+				out.result = result;
 				// send email
 
 				reply.response.out = JSON.stringify(out);

@@ -2,17 +2,15 @@ import Mailgun from 'mailgun.js';
 import Maizzle from '@maizzle/framework';
 // TODO: Vercel/SvelteKit workaround https://github.com/sveltejs/kit/issues/5999
 import authLink01 from '$templates/auth-link-01.tmpl?raw';
+import formData from 'form-data';
 import log from '$lib/logging';
 import tailwindConfig from './tailwind.config.js';
 
-//import formData from 'form-data';
-
 // import welcome01 from '$templates/welcome-01.tmpl?raw';
 
-// const mailgun = new Mailgun(formData);
-const mailgun = new Mailgun();
+const mailgun = new Mailgun(formData);
 
-const BRAND_MAIL_DOMAIN = 'notify.fairpass.co'; // TODO
+const BRAND_MAIL_DOMAIN = 'notify.ident.agency';
 // const BRAND_NAME = 'Send to Social';
 
 let mg;
@@ -32,7 +30,7 @@ export const sendEmail = async (msg) => {
 	}
 };
 
-export const composeEmail = async (template, options) => {
+export const composeEmail = async ({ template, options }) => {
 	//   const emailTemplate = fs.readFileSync(
 	//     path.resolve(`src/templates/${template}.tmpl`),
 	//     'utf8'
@@ -65,7 +63,7 @@ export const composeEmail = async (template, options) => {
 			removeUnusedCSS: true,
 			minify: true,
 			prettify: true,
-			baseURL: options.baseURL || 'https://www.fairpass.co/',
+			baseURL: options.baseURL || 'https://graph.ident.agency/',
 			locals: {
 				...options.locals
 			}
