@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { gatekeep } from "../lib/wallet/gatekeep.js";
 import prompts from "prompts";
+import qrcode from "qrcode-terminal";
 import { stringToColorBlocks } from "../lib/colorize.js";
 import { waitFor } from "../lib/wait.js";
 
@@ -12,6 +13,78 @@ const exec = async (context) => {
     case "init":
       await gatekeep(context, true);
       break;
+    case "receive": {
+      await gatekeep(context);
+
+      let network = context.flags.network || "xrpl:testnet";
+      if (network === "testnet") {
+        network = "xrpl:testnet";
+      }
+      const keys = await context.vault.keys();
+      let walletAddress;
+      const networkParts = network.split(":");
+      if (networkParts.length === 1) {
+        walletAddress = keys[network].address;
+      } else {
+        walletAddress = keys[networkParts[0]][networkParts[1]].address;
+      }
+
+      // ask user for address, amount, and tag
+      const response = await prompts([
+        {
+          type: "text",
+          name: "address",
+          message: `Enter the address from which you want to receive: `,
+          initial: walletAddress,
+        },
+        {
+          type: "text",
+          name: "amount",
+          message: `Enter the amount you want to receive (in XRP): `,
+          initial: "1.01",
+        },
+        {
+          type: "text",
+          name: "tag",
+          message: `Enter the destination tag for this transaction: `,
+          initial: false,
+        },
+      ]);
+
+      if (!response.address || !response.amount) {
+        process.exit(1);
+      }
+
+      walletAddress = response.address;
+
+      const amount = response.amount;
+      const tag = response.tag;
+
+      const searchParams = new URLSearchParams();
+      searchParams.set("amount", amount);
+      searchParams.set("dt", tag);
+
+      const qrValue = `xrpl://${walletAddress}?${searchParams.toString()}`; // not quite sure if this complies, but seems to work in xumm? https://github.com/XRPLF/XRPL-Standards/blob/master/XLS-2d/xls-2d-reference.js
+
+      // output the qr code
+      log(
+        chalk.bold(
+          `\nScan this QR code with your wallet app to ask to receive ` +
+            chalk.green(`${amount} XRP`)
+        )
+      );
+      log("Via wallet address: " + chalk.blue(walletAddress));
+      log(
+        " ".repeat(`Via wallet address: `.length) +
+          stringToColorBlocks(walletAddress, network) +
+          `${tag ? ` (tag: ${tag})` : ""}`
+      );
+      log("");
+      qrcode.generate(qrValue);
+      log("");
+
+      break;
+    }
     case "balance": {
       await gatekeep(context);
 
@@ -53,7 +126,9 @@ const exec = async (context) => {
       });
       const balance = await waitFor(balancePromise, {
         text:
-          `Checking balance for ${walletAddress} on ` +
+          `Checking balance for ` +
+          chalk.blue(`${walletAddress}`) +
+          ` on ` +
           chalk.magenta(`${network}\n`) +
           " ".repeat(`Checking balance for   `.length) +
           stringToColorBlocks(walletAddress, network),
@@ -209,6 +284,7 @@ const exec = async (context) => {
         log("  keys");
         log("  mnemonic {get,set}");
         log("  fund");
+        log("  receive");
         log("  balance");
         log("");
         log("Options:");
