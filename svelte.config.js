@@ -12,7 +12,7 @@ const config = {
 		alias: {
 			$lib: 'src/lib',
 			$static: 'static',
-			$templates: 'static/templates', // TODO: Vercel/SvelteKit workaround
+			$templates: 'static/templates' // TODO: Vercel/SvelteKit workaround
 		}
 	}
 };
