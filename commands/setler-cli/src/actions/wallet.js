@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { gatekeep } from "../lib/wallet/gatekeep.js";
 import prompts from "prompts";
+import { waitFor } from "../lib/wait.js";
 
 const log = console.log;
 
@@ -10,6 +11,65 @@ const exec = async (context) => {
     case "init":
       await gatekeep(context, true);
       break;
+    case "fund": {
+      await gatekeep(context);
+
+      let network = context.flags.network || "xrpl:testnet";
+      if (network === "testnet") {
+        network = "xrpl:testnet";
+      } else if (network === "livenet") {
+        network = "xrpl:livenet";
+      }
+      const keys = await context.vault.keys();
+
+      // convert xrpl:testnet to keys[xrpl][testnet]
+      let walletAddress;
+      const networkParts = network.split(":");
+      if (networkParts.length === 1) {
+        walletAddress = keys[network].address;
+      } else {
+        walletAddress = keys[networkParts[0]][networkParts[1]].address;
+      }
+
+      // input[2] could be {address}, in which case we should fund that address
+      // ask for the address
+      const response = await prompts([
+        {
+          type: "text",
+          name: "address",
+          message: `Enter the address you want to fund: `,
+          initial: walletAddress,
+        },
+        // confirm are you sure
+        {
+          type: "confirm",
+          name: "ok",
+          message: `Are you sure you want to fund this address?`,
+          initial: false,
+        },
+      ]);
+      if (!response.address || !response.ok) {
+        process.exit(1);
+      }
+      walletAddress = response.address;
+
+      const faucetPromise = context.coins.fundViaFaucet({
+        network,
+        address: walletAddress,
+      });
+      const status = await waitFor(faucetPromise, {
+        text: `Funding ${walletAddress} on ${network}`,
+      });
+      if (status) {
+        log(chalk.bold(`Ok, funded. New balance: ${status.balance}`));
+      } else {
+        log(chalk.red(`Funding failed.`));
+      }
+
+      await context.coins.disconnect();
+
+      break;
+    }
     case "keys":
       await gatekeep(context);
 

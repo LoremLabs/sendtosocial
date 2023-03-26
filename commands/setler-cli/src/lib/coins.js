@@ -107,6 +107,15 @@ Coins.prototype.getWallet = async function (address) {
   return wallet;
 };
 
+Coins.prototype.fundViaFaucet = async function ({ network, address }) {
+  const client = await this.getClient(network);
+  const wallet = await this.getWallet(address);
+
+  const { balance } = await client.fundWallet(wallet);
+  // console.log({balance});
+  return { balance };
+};
+
 Coins.prototype.getConfig = async function (network, type) {
   // get configuration from config
   // get the endpoint
