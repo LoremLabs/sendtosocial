@@ -1,27 +1,22 @@
 # Send to Social
 
-Use Social Media usernames to send money.
+Use existing usernames (social media, email, etc.) to send money. This is a hackathon project for the [Unlocking the Potential of XRP Ledger Hackathon](https://unlockingxrpl.devpost.com/?utm_campaign=send-to-social).
 
 ## Overview
 
-This is a simple service that allows you to send money to a social media user. It uses the XRPL to receive funds and then sends the funds to the social media user
-if we know the payment account for the user.
+This is a simple service that allows you to send money to a user who may not yet have an XRP address. It's implemented as a command line tool that creates a non-custodial wallet as well as a backend service that watches for incoming payments and fulfills escrowed payments.
 
 ## How it works
 
-An escrowed payment, sent to our "payment address", is created on the XRPL. This transaction is created with a `did` encoded tag of the identifier (username, email, etc.) of the person
-they want to send the funds to. The escrow's pre-image and identifier are sent to api so that it can fulfill the escrow when the identifier adds their payment addresss. If the identifier does not add their payment address, the escrow will expire and the funds will be returned to the sender.
+To send money to an email for example, you'd issue a command requesting to send money to Distributed Identifiers (DIDs) which can be associated with a social media account or email address. The tool uses the escrow functionality of the XRPL to set aside funds, notifies our backend of the new user, and later creates a payment when we know the payment account for the user.
 
-## Basic flow
-
-1. Create an account on the XRPL
-2. Fund the account with enough XRP to cover the escrowed payment
-3. Create a DID from the identifier you want to send the funds to (`did:kudos:email:...` or `did:kudos:twitter:...`)
-4. Issue the `send social` command and follow the prompts
+## Example
 
 ```bash
 $ setler send social did:kudos:email:matt@loremlabs.com ...
 ```
+
+![Screen-Recording-2023-03-25-at-20 03 15](https://user-images.githubusercontent.com/170588/227736633-93f70b05-56d2-4993-9de2-9a446d19404c.gif)
 
 ## What happens
 
