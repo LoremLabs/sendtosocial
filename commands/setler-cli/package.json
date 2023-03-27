@@ -63,7 +63,6 @@
     "ripple-address-codec": "^4.2.5",
     "timeago.js": "^4.0.2",
     "update-notifier": "^5.1.0",
-    "utils": "link:@noble/hashes/utils",
     "uuid": "^8.3.2",
     "uuid-encoder": "^1.2.0",
     "window-size": "^1.1.1",
