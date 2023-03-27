@@ -32,6 +32,9 @@ pnpm run build
 Copy emails to the right place:
 
 ```
-cp -r dist/* ../../packages/fairpass-emails/
+cp -r tmp/send-to-socials-emails/src/templates/auth-link-01.html ../../src/templates/auth-link-01.tmpl
 ```
 
+## Email Notes
+
+Layouts don't work so you have to copy the layout template into each email template. Also locals are accessed without the `page` prefix.
