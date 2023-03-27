@@ -143,16 +143,16 @@ export const submitPoolRequest = async (_, params) => {
 				// TODO	HERE
 				const output = await composeEmail({
 					template: 'auth-link-01',
-					options: { to: email, next: '', linkId: '', code, baseUrl: 'https://graph.ident.agency' }
+					options: { to: email,  baseUrl: 'https://graph.ident.agency', locals: { code } }
 				});
 
-				const botEmail = `"Send to Social" <no-reply@notify.ident.agency>`;
+				const botEmail = `"--send-to-social--" <no-reply@notify.ident.agency>`;
 				const msg = {
 					'h:Sender': botEmail,
 					from: `no-reply@notify.ident.agency`,
 					to: [email],
 					//        bcc: [email],
-					subject: output.subject || 'Send to Social - 🚀 Login',
+					subject: output.subject || '--send-to-social - 🚀 Login Code',
 					//text,
 					html: output.html,
 					//        headers, // must have h: prefix, but maybe we don't want them anyway
