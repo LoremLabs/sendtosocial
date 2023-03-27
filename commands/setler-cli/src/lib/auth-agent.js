@@ -231,7 +231,7 @@ AuthAgent.prototype.sendToPool = async function ({ request, context }) {
     };
     // console.log(fetchToCurl(`${identityResolver}/api/v1/gql`, options));
     // remove trailing slash if it's on identityResolver
-    results = await fetch(`${identityResolver}/gql`, options).then(
+    results = await fetch(`${identityResolver}/api/v1/gql`, options).then(
       async (r) => {
         // check status code
         if (r.status !== 200) {
