@@ -1,5 +1,5 @@
 {
-  "name": "setler-cli",
+  "name": "@loremlabs/send-to-social",
   "version": "0.0.0",
   "description": "setler command-line tool",
   "license": "MIT",
