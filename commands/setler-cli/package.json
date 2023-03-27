@@ -1,6 +1,6 @@
 {
   "name": "@loremlabs/send-to-social",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "setler command-line tool",
   "license": "MIT",
   "type": "module",
