@@ -1,5 +1,7 @@
 # Send to Social
 
+![image](https://user-images.githubusercontent.com/170588/228046344-7e852b78-b91a-4de6-9e94-9575dc013312.png)
+
 Use existing usernames (social media, email, etc.) to send money. This is a hackathon project for the [Unlocking the Potential of XRP Ledger Hackathon](https://unlockingxrpl.devpost.com/?utm_campaign=send-to-social).
 
 ## Overview
