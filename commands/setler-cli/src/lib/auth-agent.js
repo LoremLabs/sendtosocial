@@ -22,22 +22,20 @@ export const AuthAgent = function ({ context }) {
   this.identResolver = identResolver;
 };
 
-AuthAgent.prototype.startAuth = async function ({ did }) {
+AuthAgent.prototype.startAuth = async function ({ did, network }) {
   // what type of did is this?
   // did:kudos:email:foo => didType = kudos:email
   const didType = did.split(":")[1] + ":" + did.split(":")[2];
 
-  // generate a random state
-  const state =
+  const nonce =
     Math.random().toString(36).substring(2, 15) +
     Math.random().toString(36).substring(2, 15);
-  // log({state});
 
   switch (didType) {
     case "kudos:email": {
       // get email
       const email = did.split(":")[3];
-      return this.startEmailAuth({ email, state });
+      return this.startEmailAuth({ email, nonce, network });
       break;
     }
     default: {
@@ -56,7 +54,81 @@ const hexToBytes = (hex) => {
   return hexTo(hex);
 };
 
-AuthAgent.prototype.startEmailAuth = async function ({ email, state }) {
+AuthAgent.prototype.verifyAuthCode = async function ({
+  rid,
+  code,
+  nonce,
+  network,
+}) {
+  const context = this.context;
+
+  if (!context.keys) {
+    context.keys = await context.vault.keys();
+  }
+
+  // get the key from the network
+  const networkParts = network.split(":");
+  let keys;
+  if (networkParts.length === 1) {
+    keys = context.keys[network];
+  } else {
+    keys = context.keys[networkParts[0]][networkParts[1]];
+  }
+
+  let { privateKey, address } = keys;
+  privateKey = normalizePrivateKey(privateKey);
+
+  const payload = JSON.stringify({
+    nonce,
+    code,
+    rid,
+    address, // keep in the payload
+  });
+
+  // sign the payload
+  const { signature, recId } = await context.vault.sign({
+    keys,
+    message: payload,
+    signingKey: privateKey,
+  });
+
+  const request = {
+    rid: shortId(),
+    path: "/auth/email/verify",
+    in: payload,
+    signature: `${signature}${recId}`, // TODO: is there a standard for this? recId is 0 or 1
+  };
+
+  // log({ request });
+
+  const { response, status } = await this.sendToPool({ request, context });
+  //log({ response, status });
+  if (status.code !== 200) {
+    const e = new Error(status.message);
+    e._status = status;
+    e._response = response;
+    throw e;
+  }
+
+  return { response, status, nonce };
+};
+
+const normalizePrivateKey = (privateKey) => {
+  if (typeof privateKey === "string") {
+    if (privateKey.length === 66) {
+      // remove 00 prefix
+      privateKey = privateKey.slice(2);
+    }
+  }
+
+  return privateKey;
+};
+
+AuthAgent.prototype.startEmailAuth = async function ({
+  email,
+  nonce,
+  network,
+}) {
   const context = this.context;
   // post to ident agent api which will send a code to the email address
 
@@ -64,32 +136,30 @@ AuthAgent.prototype.startEmailAuth = async function ({ email, state }) {
     context.keys = await context.vault.keys();
   }
 
-  // get our address from the context
-  const a = hexToBytes(context.keys.kudos.publicKey);
-  const address = deriveAddressFromBytes(a);
+  // get the key from the network
+  const networkParts = network.split(":");
+  let keys;
+  if (networkParts.length === 1) {
+    keys = context.keys[network];
+  } else {
+    keys = context.keys[networkParts[0]][networkParts[1]];
+  }
+
+  let { privateKey, address } = keys;
+  privateKey = normalizePrivateKey(privateKey);
 
   const payload = JSON.stringify({
-    state, // nonce
+    nonce,
     email,
     address, // keep in the payload
   });
 
   // sign the payload
   const { signature, recId } = await context.vault.sign({
-    keys: context.keys.kudos,
+    keys,
     message: payload,
-    signingKey: context.keys.kudos.privateKey,
+    signingKey: privateKey,
   });
-
-  // log ({signature, recId});
-
-  // const verified = await context.vault.verify({
-  //   keys: context.keys.kudos,
-  //   message: payload,
-  //   signature,
-  // });
-
-  // log({verified});
 
   const request = {
     rid: shortId(),
@@ -98,10 +168,18 @@ AuthAgent.prototype.startEmailAuth = async function ({ email, state }) {
     signature: `${signature}${recId}`, // TODO: is there a standard for this? recId is 0 or 1
   };
 
-  log({ request });
+  // log({ request });
 
   const { response, status } = await this.sendToPool({ request, context });
-  log({ response, status });
+  //log({ response, status });
+  if (status.code !== 200) {
+    const e = new Error(status.message);
+    e._status = status;
+    e._response = response;
+    throw e;
+  }
+
+  return { response, status, nonce };
 };
 
 AuthAgent.prototype.sendToPool = async function ({ request, context }) {

@@ -20,6 +20,8 @@ try {
 	process.exit(1);
 }
 
+const SEND_SOCIAL_ADDRESS = process.env.SEND_SOCIAL_ADDRESS || 'rhDEt27CCSbdA8hcnvyuVniSuQxww3NAs3';
+
 const hexToBytes = (hex) => {
 	// check if it's a hex string, starting with 0x
 	if (typeof hex === 'string' && hex.match(/^0x([0-9a-f][0-9a-f])*$/i)) {
@@ -28,6 +30,54 @@ const hexToBytes = (hex) => {
 	}
 
 	return hexTo(hex);
+};
+
+const normalizePrivateKey = (privateKey) => {
+	if (typeof privateKey === 'string') {
+		if (privateKey.length === 66) {
+			// remove 00 prefix
+			privateKey = privateKey.slice(2);
+		}
+	}
+
+	return privateKey;
+};
+
+const signMessage = async ({ message, address }) => {
+	const hashedMessage = sha256(JSON.stringify(message));
+	const { privateKey } = await getKeys(address);
+
+	const [sig, recId] = await secp256k1.sign(hashedMessage, hexToBytes(privateKey), {
+		recovered: true
+	});
+
+	return `${bytesToHex(sig)}${recId}`;
+};
+
+export const getKeys = async function (address) {
+	// TODO: get seed from vault directly
+
+	// we iterate through process.env.WALLET_SEED_* and find the one that matches the address. Values are address:data:data2
+	// where data is the public key and data2 is the private key
+
+	let found = null;
+	for (const key in process.env) {
+		if (key.startsWith('WALLET_SEED_')) {
+			const keyString = process.env[key] as string;
+			const [walletAddress, publicKey, privateKey] = keyString.split(':');
+
+			if (walletAddress === address) {
+				found = { walletAddress, publicKey, privateKey: normalizePrivateKey(privateKey) };
+				break;
+			}
+		}
+	}
+
+	if (!found) {
+		throw new Error(`Wallet seed not found for address: ${address}`);
+	}
+
+	return found;
 };
 
 const validate = async (params) => {
@@ -48,7 +98,7 @@ const validate = async (params) => {
 		return hash160; // was Buffer.from(hash160);
 	}
 
-	log.info(JSON.stringify({ sig, recId, message }));
+	// log.info(JSON.stringify({ sig, recId, message }));
 	let verified = {};
 	try {
 		const hashedMessage = sha256(message);
@@ -87,7 +137,6 @@ export const submitPoolRequest = async (_, params) => {
 	const { rid, path, signature } = params;
 	let input;
 
-	let out = '';
 	const reply = {
 		status: {
 			code: 200,
@@ -95,9 +144,9 @@ export const submitPoolRequest = async (_, params) => {
 		},
 		response: {
 			publicKey: '',
-			rid: '',
-			path: '',
-			out,
+			rid,
+			path,
+			out: '',
 			signature: ''
 		}
 	};
@@ -116,6 +165,51 @@ export const submitPoolRequest = async (_, params) => {
 		});
 
 		switch (path) {
+			case '/auth/email/verify': {
+				const out = {};
+
+				// check the code
+				const cacheKey = `auth-email-login-${input.rid}`;
+				const cached = await redis.get(cacheKey);
+				if (!cached) {
+					throw new Error('Invalid code');
+				}
+
+				// we can create a credential-map that this email address is owned by this address
+				const credentialMap = [];
+				credentialMap.push(cached.address);
+				credentialMap.push(`did:kudos:email:${cached.email}`);
+
+				// we will sign this credential map with our private key
+
+				// create a signature
+				const signature = await signMessage({
+					message: credentialMap,
+					address: SEND_SOCIAL_ADDRESS
+				});
+
+				out['credential-map'] = credentialMap;
+				out.signature = signature;
+
+				const mapping = {};
+				mapping.costXrp = 10; // xrp
+				mapping.address = SEND_SOCIAL_ADDRESS;
+				mapping.terms = 'https://send-to-social.ident.agency/terms';
+				mapping.expiration = 60 * 60 * 24 * 365;
+
+				out.mapping = mapping;
+
+				const signature2 = await signMessage({
+					message: out,
+					address: SEND_SOCIAL_ADDRESS
+				});
+
+				reply.response.out = JSON.stringify(out);
+				reply.response.rid = input.rid; // not quite a request id, but a transaction id
+				reply.response.signature = signature2;
+
+				break;
+			}
 			case '/auth/email/login': {
 				// start email stuff
 
@@ -131,7 +225,8 @@ export const submitPoolRequest = async (_, params) => {
 				// reply.status.message = code;
 
 				const out = {};
-				out.code = code;
+				out.rid = rid;
+				out.nonce = input.nonce; // client should check that this matches the nonce sent in the request
 
 				// save the code to redis
 				const cacheKey = `auth-email-login-${rid}`;
@@ -143,7 +238,7 @@ export const submitPoolRequest = async (_, params) => {
 				// TODO	HERE
 				const output = await composeEmail({
 					template: 'auth-link-01',
-					options: { to: email,  baseUrl: 'https://graph.ident.agency', locals: { code } }
+					options: { to: email, baseUrl: 'https://send-to-social.ident.agency', locals: { code } }
 				});
 
 				const botEmail = `"--send-to-social--" <no-reply@notify.ident.agency>`;
@@ -162,7 +257,7 @@ export const submitPoolRequest = async (_, params) => {
 				};
 
 				const result = await sendEmail(msg);
-				log.debug({ result });
+				// log.debug({ result });
 				out.result = result;
 				// send email
 
@@ -177,6 +272,7 @@ export const submitPoolRequest = async (_, params) => {
 			}
 		}
 	} catch (e) {
+		log.info(e);
 		if (e instanceof SyntaxError) {
 			reply.status.code = 400;
 			reply.status.message = 'Invalid input';

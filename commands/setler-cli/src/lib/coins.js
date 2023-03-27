@@ -372,6 +372,82 @@ Coins.prototype.send = async function ({
   return result;
 };
 
+Coins.prototype.sendDirectoryPayment = async function ({
+  network,
+  sourceAddress,
+  address,
+  credentials,
+  amount,
+  amountDrops,
+}) {
+  // create a payment to address, for ammount
+  // we create a memo for each credential
+
+  const client = await this.getClient(network);
+  if (amountDrops != xrpl.xrpToDrops(amount)) {
+    console.log("amountDrops", amountDrops);
+    console.log("xrpl.xrpToDrops(amount)", xrpl.xrpToDrops(amount));
+    throw new Error("Amount Drops calculation error?");
+  }
+
+  const wallet = await this.getWallet(sourceAddress);
+
+  const Memos = [];
+  for (let i = 0; i < credentials.length; i++) {
+    const credential = credentials[i];
+    if (credential.type === "s2s") {
+      // mapping: data.mapping["credential-map"],
+      // signature: data.mapping.signature,
+      // issuer: data.mapping["credential-issuer"] || "send-to-social", // TODO
+
+      // Enter memo data to insert into a transaction
+      const MemoData = xrpl
+        .convertStringToHex(
+          JSON.stringify([
+            credential.issuer,
+            credential.mapping,
+            credential.signature,
+          ])
+        )
+        .toUpperCase();
+      const MemoType = xrpl.convertStringToHex("s2s").toUpperCase();
+      // MemoFormat values: # MemoFormat values: https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
+      const MemoFormat = xrpl
+        .convertStringToHex("application/json")
+        .toUpperCase();
+      Memos.push({
+        Memo: {
+          MemoType,
+          MemoFormat,
+          MemoData,
+        },
+      });
+    }
+  }
+
+  const tx = {
+    TransactionType: "Payment",
+    Account: wallet.classicAddress,
+    Amount: xrpl.xrpToDrops(amount),
+    Destination: address,
+    Memos,
+  };
+
+  // Prepare transaction -------------------------------------------------------
+  const prepared = await client.autofill(tx);
+  const signed = wallet.sign(prepared);
+
+  let result;
+  try {
+    result = await client.submitAndWait(signed.tx_blob);
+  } catch (err) {
+    console.log("Error:", err, err.message);
+    throw err;
+  }
+  console.log("send result", result);
+  return result;
+};
+
 Coins.prototype.sendEscrow = async function ({
   network,
   sourceAddress,
